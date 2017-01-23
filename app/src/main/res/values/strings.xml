@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">MusicPlayer</string>
+    <string name="stop_button_text">Stop</string>
+    <string name="play">Play</string>
+    <string name="idle">Idle</string>
+    <string name="status">Status</string>
+    <string name="pause">Pause</string>
+    <string name="paused">Paused</string>
+    <string name="playing">Playing</string>
+    <string name="stopped">Stopped</string>
+</resources>
