@@ -2,15 +2,21 @@ package com.example.user.musicplayer;
 
 
 import android.app.Notification;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
+import android.support.annotation.RequiresApi;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+import android.view.View;
+import android.widget.RemoteViews;
 
 import java.io.IOException;
 
@@ -23,7 +29,7 @@ public class PlayerService extends Service {
 
   @Override
   public void onCreate() {
-    startForeground(SERVICE_ID, new Notification());
+    startForeground(SERVICE_ID, getNotification());
     mediaPlayer = new MediaPlayer();
     try {
       mediaPlayer.setDataSource(getApplicationContext(), MUSIC_FILE);
@@ -67,7 +73,7 @@ public class PlayerService extends Service {
           break;
         case PlayerActivity.STATUS_PLAYING:
           if (status == PlayerActivity.STATUS_IDLE || status == PlayerActivity.STATUS_STOPPED) {
-            startForeground(SERVICE_ID, new Notification());
+            startForeground(SERVICE_ID, getNotification());
             try {
               Log.d("status", String.valueOf(status));
               mediaPlayer.prepare();
@@ -92,6 +98,28 @@ public class PlayerService extends Service {
       mediaPlayer.seekTo(currentTime * 1000);
     }
     return super.onStartCommand(intent, flags, startId);
+  }
+
+  private Notification getNotification() {
+    RemoteViews views = new RemoteViews(getPackageName(),
+            R.layout.notification_panel);
+    views.setViewVisibility(R.id.b_play_notification, View.VISIBLE);
+    Intent stopIntent = new Intent();
+    stopIntent.setAction(PlayerActivity.ACTION_STATUS);
+    stopIntent.putExtra(PlayerActivity.EXTRA_STATUS, PlayerActivity.STATUS_STOPPED);
+    views.setOnClickPendingIntent(R.id.b_play_notification, PendingIntent.getService(this, 0, stopIntent, 0));
+
+    Intent playIntent = new Intent();
+    playIntent.setAction(PlayerActivity.ACTION_STATUS);
+    playIntent.putExtra(PlayerActivity.EXTRA_STATUS, PlayerActivity.STATUS_PLAYING);
+    views.setOnClickPendingIntent(R.id.b_play_notification, PendingIntent.getService(this, 0, playIntent, 0));
+
+    Notification.Builder builder = new Notification.Builder(this);
+    @SuppressWarnings("deprecation")
+    Notification notification=builder.getNotification();
+
+    notification.contentView = views;
+    return notification;
   }
 
   @Nullable

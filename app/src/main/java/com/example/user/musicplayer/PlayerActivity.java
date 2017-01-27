@@ -6,9 +6,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v7.app.AppCompatActivity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
@@ -28,8 +30,10 @@ public class PlayerActivity extends AppCompatActivity {
   private Button playPauseButton;
   private Button stopButton;
   private TextView statusTextView;
-  private SeekBar seekBar;
+  private SeekBar progressSeekBar;
+  private SeekBar volumeSeekBar;
 
+  private AudioManager audioManager;
   private int playerStatus = STATUS_IDLE;
   private ServiceConnection serviceConnection;
   private BroadcastReceiver playerBroadcastReceiver;
@@ -46,7 +50,7 @@ public class PlayerActivity extends AppCompatActivity {
       public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
         PlayerService.PlayerBinder binder = (PlayerService.PlayerBinder) iBinder;
         playerStatus = binder.getStatus();
-        seekBar.setMax(binder.getAudioDuration());
+        progressSeekBar.setMax(binder.getAudioDuration());
         updateViews();
       }
 
@@ -61,10 +65,10 @@ public class PlayerActivity extends AppCompatActivity {
     playerBroadcastReceiver = new BroadcastReceiver() {
       @Override
       public void onReceive(Context context, Intent intent) {
-        if(intent.getAction().equals(ACTION_PROGRESS)) {
+        if (intent.getAction().equals(ACTION_PROGRESS)) {
           int progress = intent.getIntExtra(EXTRA_SEEKBAR_PROGRESS, -1);
-          seekBar.setProgress(progress);
-        } else{
+          progressSeekBar.setProgress(progress);
+        } else {
           playerStatus = STATUS_STOPPED;
           updateViews();
         }
@@ -88,26 +92,37 @@ public class PlayerActivity extends AppCompatActivity {
     switch (playerStatus) {
       case STATUS_IDLE:
         statusTextView.setText(R.string.idle);
+        stopButton.setEnabled(false);
         break;
       case STATUS_PAUSED:
         statusTextView.setText(R.string.paused);
+        stopButton.setEnabled(true);
         break;
       case STATUS_PLAYING:
         statusTextView.setText(R.string.playing);
         playPauseButton.setText(R.string.pause);
+        stopButton.setEnabled(true);
         break;
       case STATUS_STOPPED:
-        seekBar.setProgress(0);
+        progressSeekBar.setProgress(0);
         statusTextView.setText(R.string.stopped);
+        stopButton.setEnabled(false);
         break;
     }
   }
 
   private void initViews() {
-    seekBar = (SeekBar) findViewById(R.id.sb_player_seek_bar);
+    progressSeekBar = (SeekBar) findViewById(R.id.sb_player_seek_bar);
     playPauseButton = (Button) findViewById(R.id.b_playPause);
     stopButton = (Button) findViewById(R.id.b_stop);
     statusTextView = (TextView) findViewById(R.id.tv_status);
+    volumeSeekBar = (SeekBar) findViewById(R.id.sb_volume);
+    audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+    volumeSeekBar.setMax(audioManager
+            .getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+    volumeSeekBar.setProgress(audioManager
+            .getStreamVolume(AudioManager.STREAM_MUSIC));
+
     playPauseButton.setOnClickListener(new View.OnClickListener() {
       @Override
       public void onClick(View view) {
@@ -125,7 +140,7 @@ public class PlayerActivity extends AppCompatActivity {
       }
     });
 
-    seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+    progressSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
       @Override
       public void onProgressChanged(SeekBar seekBar, int progress, boolean changedByUser) {
         if (changedByUser) {
@@ -144,5 +159,45 @@ public class PlayerActivity extends AppCompatActivity {
       }
     });
 
+    volumeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+      @Override
+      public void onProgressChanged(SeekBar seekBar, int progress, boolean changedByUser) {
+        if (changedByUser) {
+          audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, progress, 0);
+        }
+      }
+
+      @Override
+      public void onStartTrackingTouch(SeekBar seekBar) {
+        //do nothing
+      }
+
+      @Override
+      public void onStopTrackingTouch(SeekBar seekBar) {
+        //do nothing
+      }
+    });
+
   }
+
+  @Override
+  public boolean dispatchKeyEvent(KeyEvent event) {
+    int action = event.getAction();
+    int keyCode = event.getKeyCode();
+    super.dispatchKeyEvent(event);
+    switch (keyCode) {
+      case KeyEvent.KEYCODE_VOLUME_UP:
+        if (action == KeyEvent.ACTION_DOWN) {
+          volumeSeekBar.setProgress(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) + 1);
+        }
+        return false;
+      case KeyEvent.KEYCODE_VOLUME_DOWN:
+        if (action == KeyEvent.ACTION_DOWN) {
+          volumeSeekBar.setProgress(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) - 1);
+        }
+        return false;
+    }
+    return false;
+  }
+
 }
