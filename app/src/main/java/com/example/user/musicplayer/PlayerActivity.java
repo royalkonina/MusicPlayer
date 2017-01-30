@@ -69,7 +69,8 @@ public class PlayerActivity extends AppCompatActivity {
           int progress = intent.getIntExtra(EXTRA_SEEKBAR_PROGRESS, -1);
           progressSeekBar.setProgress(progress);
         } else {
-          playerStatus = STATUS_STOPPED;
+          int status = intent.getIntExtra(EXTRA_STATUS, STATUS_IDLE);
+          playerStatus = status;
           updateViews();
         }
       }

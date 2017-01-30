@@ -2,18 +2,17 @@ package com.example.user.musicplayer;
 
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Build;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
-import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -24,12 +23,16 @@ public class PlayerService extends Service {
 
   private MediaPlayer mediaPlayer;
   private int status = PlayerActivity.STATUS_IDLE;
-  public static final int SERVICE_ID = 214;
+  public static final int NOTIFICATION_ID = 214;
   private static final Uri MUSIC_FILE = Uri.parse("android.resource://com.example.user.musicplayer/raw/sample_music_file");
+  private RemoteViews remoteViews;
+  private Notification notification;
+  private NotificationManager notificationManager;
 
   @Override
   public void onCreate() {
-    startForeground(SERVICE_ID, getNotification());
+    notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+    startForeground(NOTIFICATION_ID, getNotification());
     mediaPlayer = new MediaPlayer();
     try {
       mediaPlayer.setDataSource(getApplicationContext(), MUSIC_FILE);
@@ -73,7 +76,6 @@ public class PlayerService extends Service {
           break;
         case PlayerActivity.STATUS_PLAYING:
           if (status == PlayerActivity.STATUS_IDLE || status == PlayerActivity.STATUS_STOPPED) {
-            startForeground(SERVICE_ID, getNotification());
             try {
               Log.d("status", String.valueOf(status));
               mediaPlayer.prepare();
@@ -81,6 +83,7 @@ public class PlayerService extends Service {
               e.printStackTrace();
             }
           }
+          startForeground(NOTIFICATION_ID, getNotification());
           mediaPlayer.start();
           new Thread(new Runnable() {
             @Override
@@ -93,6 +96,8 @@ public class PlayerService extends Service {
           break;
       }
       status = newStatus;
+      updateNotificationViews();
+      sendBroadcast(new Intent(PlayerActivity.ACTION_STATUS).putExtra(PlayerActivity.EXTRA_STATUS, status));
     } else {
       int currentTime = intent.getIntExtra(PlayerActivity.EXTRA_SEEKBAR_PROGRESS, 0);
       mediaPlayer.seekTo(currentTime * 1000);
@@ -100,25 +105,58 @@ public class PlayerService extends Service {
     return super.onStartCommand(intent, flags, startId);
   }
 
+  private void updateNotificationViews() {
+
+    switch (status) {
+      case PlayerActivity.STATUS_PLAYING:
+        remoteViews.setViewVisibility(R.id.b_play_notification, View.GONE);
+        remoteViews.setViewVisibility(R.id.b_pause_notification, View.VISIBLE);
+        remoteViews.setViewVisibility(R.id.b_stop_notification, View.VISIBLE);
+        break;
+      case PlayerActivity.STATUS_STOPPED:
+        remoteViews.setViewVisibility(R.id.b_play_notification, View.VISIBLE);
+        remoteViews.setViewVisibility(R.id.b_pause_notification, View.GONE);
+        remoteViews.setViewVisibility(R.id.b_stop_notification, View.GONE);
+        break;
+      case PlayerActivity.STATUS_PAUSED:
+        remoteViews.setViewVisibility(R.id.b_play_notification, View.VISIBLE);
+        remoteViews.setViewVisibility(R.id.b_pause_notification, View.GONE);
+        remoteViews.setViewVisibility(R.id.b_stop_notification, View.VISIBLE);
+        break;
+      default:
+        remoteViews.setViewVisibility(R.id.b_play_notification, View.VISIBLE);
+        remoteViews.setViewVisibility(R.id.b_pause_notification, View.GONE);
+        remoteViews.setViewVisibility(R.id.b_stop_notification, View.GONE);
+        break;
+    }
+    notificationManager.notify(NOTIFICATION_ID, notification);
+
+  }
+
   private Notification getNotification() {
-    RemoteViews views = new RemoteViews(getPackageName(),
-            R.layout.notification_panel);
-    views.setViewVisibility(R.id.b_play_notification, View.VISIBLE);
-    Intent stopIntent = new Intent();
-    stopIntent.setAction(PlayerActivity.ACTION_STATUS);
-    stopIntent.putExtra(PlayerActivity.EXTRA_STATUS, PlayerActivity.STATUS_STOPPED);
-    views.setOnClickPendingIntent(R.id.b_play_notification, PendingIntent.getService(this, 0, stopIntent, 0));
+    if (remoteViews == null || notification == null) {
+      remoteViews = new RemoteViews(getPackageName(), R.layout.notification_panel);
+      Notification.Builder builder = new Notification.Builder(this);
+      builder.setSmallIcon(R.mipmap.ic_launcher)
+              .setContent(remoteViews);
+      notification = builder.build();
 
-    Intent playIntent = new Intent();
-    playIntent.setAction(PlayerActivity.ACTION_STATUS);
-    playIntent.putExtra(PlayerActivity.EXTRA_STATUS, PlayerActivity.STATUS_PLAYING);
-    views.setOnClickPendingIntent(R.id.b_play_notification, PendingIntent.getService(this, 0, playIntent, 0));
+      Intent stopIntent = new Intent(getApplicationContext(), PlayerService.class);
+      stopIntent.setAction(PlayerActivity.ACTION_STATUS);
+      stopIntent.putExtra(PlayerActivity.EXTRA_STATUS, PlayerActivity.STATUS_STOPPED);
+      remoteViews.setOnClickPendingIntent(R.id.b_stop_notification, PendingIntent.getService(this, 0, stopIntent, 0));
 
-    Notification.Builder builder = new Notification.Builder(this);
-    @SuppressWarnings("deprecation")
-    Notification notification=builder.getNotification();
+      Intent pauseIntent = new Intent(getApplicationContext(), PlayerService.class);
+      pauseIntent.setAction(PlayerActivity.ACTION_STATUS);
+      pauseIntent.putExtra(PlayerActivity.EXTRA_STATUS, PlayerActivity.STATUS_PAUSED);
+      remoteViews.setOnClickPendingIntent(R.id.b_pause_notification, PendingIntent.getService(this, 1, pauseIntent, 0));
 
-    notification.contentView = views;
+      Intent playIntent = new Intent(getApplicationContext(), PlayerService.class);
+      playIntent.setAction(PlayerActivity.ACTION_STATUS);
+      playIntent.putExtra(PlayerActivity.EXTRA_STATUS, PlayerActivity.STATUS_PLAYING);
+      remoteViews.setOnClickPendingIntent(R.id.b_play_notification, PendingIntent.getService(this, 2, playIntent, 0));
+    }
+    updateNotificationViews();
     return notification;
   }
 
@@ -139,7 +177,7 @@ public class PlayerService extends Service {
     public int getAudioDuration() {
       MediaMetadataRetriever metaRetriever = new MediaMetadataRetriever();
       metaRetriever.setDataSource(getApplicationContext(), MUSIC_FILE);
-      return Integer.parseInt(metaRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION))/1000;
+      return Integer.parseInt(metaRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)) / 1000;
     }
 
   }

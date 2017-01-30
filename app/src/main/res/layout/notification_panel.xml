@@ -4,19 +4,26 @@
               android:layout_height="match_parent"
               android:orientation="horizontal">
 
-    <Button
+    <ImageButton
         android:id="@+id/b_play_notification"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/play"
-
+        android:src="@android:drawable/ic_media_play"
         />
 
-    <Button
+    <ImageButton
+        android:id="@+id/b_pause_notification"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@android:drawable/ic_media_pause"
+        android:visibility="gone"
+        />
+
+    <ImageButton
         android:id="@+id/b_stop_notification"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/stop_button_text"
+        android:src="@drawable/ic_media_stop"
         />
 
 </LinearLayout>
